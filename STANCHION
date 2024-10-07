@@ -1,0 +1,164 @@
+#include <TinyGPS++.h>
+#include <SoftwareSerial.h>
+
+// Solar Panel Pins (LDRs)
+const int leftPanelPin = A0;
+const int rightPanelPin = A1;
+const int topPanelPin = A2;
+const int bottomPanelPin = A3;
+
+// Motor control pins for L293D
+const int horizontalIn1 = 9;
+const int horizontalIn2 = 10;
+const int verticalIn3 = 11;
+const int verticalIn4 = 12;
+const int horizontalEnable = 5;
+const int verticalEnable = 6;
+
+// Variables to store motor position (degrees)
+int horizontalPosition = 90;  // Start at the middle of 180° range
+int verticalPosition = 45;    // Start at the middle of 90° range
+
+
+// LM35 temperature sensor pin
+const int tempSensorPin = A4;  // Updated from A0 to avoid conflict
+
+// monitor water
+const int waterSensorPin = 3;
+
+// Limits
+const int maxHorizontalDegrees = 180;
+const int minHorizontalDegrees = 0;
+const int maxVerticalDegrees = 90;
+const int minVerticalDegrees = 0;
+
+// Motor speed and other variables
+int motorSpeedPWM = 100;
+int leftPanelValue, rightPanelValue, topPanelValue, bottomPanelValue;
+
+void setup() {
+  // Motor setup
+  pinMode(horizontalIn1, OUTPUT);
+  pinMode(horizontalIn2, OUTPUT);
+  pinMode(verticalIn3, OUTPUT);
+  pinMode(verticalIn4, OUTPUT);
+  pinMode(horizontalEnable, OUTPUT);
+  pinMode(verticalEnable, OUTPUT);
+  pinMode(waterSensorPin, INPUT);
+  
+  // Initialize serial for debug output and GPS
+  Serial.begin(9600);
+  Serial.println("Initializing System...");
+}
+
+void loop() {
+  // Motor Control Logic (Solar Tracking)
+  trackSun();
+  delay(50);
+
+  // Temperature Monitoring
+  monitorTemperature();
+
+  // Water Monitoring
+  monitorWater();
+
+  delay(1000);  // General delay for all sensors and updates
+}
+
+// Function to track the sun using the solar panel data
+void trackSun() {
+  // Read the analog values from the solar panels
+  leftPanelValue = analogRead(leftPanelPin);
+  rightPanelValue = analogRead(rightPanelPin);
+  topPanelValue = analogRead(topPanelPin);
+  bottomPanelValue = analogRead(bottomPanelPin);
+
+  // Horizontal movement logic (left-right) within 180 degrees
+  if (leftPanelValue > rightPanelValue + 50 && horizontalPosition < maxHorizontalDegrees) {
+    // Move right
+    digitalWrite(horizontalIn1, HIGH);
+    digitalWrite(horizontalIn2, LOW);
+    analogWrite(horizontalEnable, motorSpeedPWM);
+
+    Serial.print(leftPanelValue);
+    Serial.print(",");
+    Serial.print(rightPanelValue);
+    Serial.print(",");
+    Serial.print(topPanelValue);
+    Serial.print(",");
+    Serial.println(bottomPanelValue);
+
+    horizontalPosition += 1;  // Increment position (approximate movement)
+  } else if (rightPanelValue > leftPanelValue + 50 && horizontalPosition > minHorizontalDegrees) {
+    // Move left
+    digitalWrite(horizontalIn1, LOW);
+    digitalWrite(horizontalIn2, HIGH);
+    analogWrite(horizontalEnable, motorSpeedPWM);
+
+    Serial.print(leftPanelValue);
+    Serial.print(",");
+    Serial.print(rightPanelValue);
+    Serial.print(",");
+    Serial.print(topPanelValue);
+    Serial.print(",");
+    Serial.println(bottomPanelValue);
+
+    horizontalPosition -= 1;  // Decrement position (approximate movement)
+  } else {
+    // Stop horizontal motor
+    analogWrite(horizontalEnable, 0);
+  }
+
+  // Vertical movement logic (up-down) within 90 degrees
+  if (topPanelValue > bottomPanelValue + 50 && verticalPosition < maxVerticalDegrees) {
+    // Move down
+    digitalWrite(verticalIn3, HIGH);
+    digitalWrite(verticalIn4, LOW);
+    analogWrite(verticalEnable, motorSpeedPWM);
+    verticalPosition += 1;  // Increment position (approximate movement)
+  } else if (bottomPanelValue > topPanelValue + 50 && verticalPosition > minVerticalDegrees) {
+    // Move up
+    digitalWrite(verticalIn3, LOW);
+    digitalWrite(verticalIn4, HIGH);
+    analogWrite(verticalEnable, motorSpeedPWM);
+    verticalPosition -= 1;  // Decrement position (approximate movement)
+  } else {
+    // Stop vertical motor
+    analogWrite(verticalEnable, 0);
+  }
+}
+
+
+// Function to monitor the temperature using the LM35 sensor
+void monitorTemperature() {
+  // Read the analog value from the LM35 sensor
+  int sensorValue = analogRead(tempSensorPin);
+
+  // Convert the analog value to voltage and temperature
+  float voltage = sensorValue * (5.0 / 1023.0);
+  float temperatureC = voltage * 100;
+
+  // Display the temperature
+  Serial.print("Temperature: ");
+  Serial.print(temperatureC);
+  Serial.println(" °C");
+
+  // Check if temperature is good for plants
+  if (temperatureC > 15 && temperatureC < 35) {
+    Serial.println("Temperature is good for plants.");
+  } else {
+    Serial.println("Temperature is not suitable for plants.");
+  }
+}
+
+void monitorWater() {
+    int sensorvalue = digitalRead(waterSensorPin);
+    
+    Serial.println(sensorvalue);
+    
+    if (sensorvalue = HIGH) {
+      Serial.println("The Water is available in this area.");
+    } else {
+      Serial.println("No presence of water.");
+    } 
+}
